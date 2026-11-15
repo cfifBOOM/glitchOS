@@ -1,3 +1,13 @@
 {
-  "response": []
+  "response": [
+    {
+      "datetime": 1794733313,
+      "filename": "lineage-22.2-20261115_090332-UNOFFICIAL-OTA-test-fajita.zip",
+      "id": "b191cee447bf9ab49601487018814dff610c12873cc1e2cb567db77455e5b706",
+      "romtype": "unofficial",
+      "size": 1077014182,
+      "url": "https://github.com/cfifBOOM/glitchOS/releases/download/fajita-ota-test-1/lineage-22.2-20261115_090332-UNOFFICIAL-OTA-test-fajita.zip",
+      "version": "22.2"
+    }
+  ]
 }
