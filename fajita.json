@@ -1,12 +1,12 @@
 {
   "response": [
     {
-      "datetime": 1794763959,
-      "filename": "lineage-22.2-20261115_173419-UNOFFICIAL-glitchOS-0.3-fajita.zip",
-      "id": "712d46d67a52e96c2263923d3d270e932bc27ffe433b0e51bc830fc467e0f90e",
+      "datetime": 1795388410,
+      "filename": "lineage-22.2-20261123_000154-UNOFFICIAL-glitchOS-0.5.0-fajita.zip",
+      "id": "703d798d499378c3886ba601c43073bc6b2b1f3698c2d5a2258e635edea3dd25",
       "romtype": "unofficial",
-      "size": 1078135097,
-      "url": "https://github.com/cfifBOOM/glitchOS/releases/download/fajita-v0.3/lineage-22.2-20261115_173419-UNOFFICIAL-glitchOS-0.3-fajita.zip",
+      "size": 1079006013,
+      "url": "https://github.com/cfifBOOM/glitchOS/releases/download/fajita-v0.5.0/lineage-22.2-20261123_000154-UNOFFICIAL-glitchOS-0.5.0-fajita.zip",
       "version": "22.2"
     }
   ]
