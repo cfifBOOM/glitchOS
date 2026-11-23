@@ -1,0 +1,19 @@
+diff --git a/ui/build/soong.go b/ui/build/soong.go
+index 0963f76b7..634f52b4c 100644
+--- a/ui/build/soong.go
++++ b/ui/build/soong.go
+@@ -212,6 +212,14 @@ func (pb PrimaryBuilderFactory) primaryBuilderInvocation(config Config) bootstra
+ 
+ 	commonArgs = append(commonArgs, "-l", filepath.Join(pb.config.FileListDir(), "Android.bp.list"))
+ 	invocationEnv := make(map[string]string)
++	// Optional host limits for machines where the Soong graph otherwise exhausts RAM.
++	// Keep defaults unchanged unless the build launcher explicitly supplies a limit.
++	if limit := os.Getenv("SOONG_GOMEMLIMIT"); limit != "" {
++		invocationEnv["GOMEMLIMIT"] = limit
++	}
++	if gc := os.Getenv("SOONG_GOGC"); gc != "" {
++		invocationEnv["GOGC"] = gc
++	}
+ 	if pb.debugPort != "" {
+ 		//debug mode
+ 		commonArgs = append(commonArgs, "--delve_listen", pb.debugPort,

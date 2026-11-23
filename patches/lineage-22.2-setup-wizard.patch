@@ -1,0 +1,194 @@
+diff --git a/src/org/lineageos/setupwizard/WelcomeActivity.java b/src/org/lineageos/setupwizard/WelcomeActivity.java
+--- a/src/org/lineageos/setupwizard/WelcomeActivity.java
++++ b/src/org/lineageos/setupwizard/WelcomeActivity.java
+@@ -25,6 +25,9 @@
+     private static final String ACTION_ACCESSIBILITY_SETTINGS =
+             "android.settings.ACCESSIBILITY_SETTINGS_FOR_SUW";
+ 
++    private GlitchWelcomeScene glitchWelcome;
++    private boolean glitchWelcomeSeen;
++
+     @Override
+     protected void onStartSubactivity() {
+     }
+@@ -38,7 +41,18 @@
+         Button startButton = findViewById(R.id.start);
+         Button emergButton = findViewById(R.id.emerg_dialer);
+         Button skipButton = findViewById(R.id.skip);
+-        startButton.setOnClickListener(view -> onNextPressed());
++        startButton.setOnClickListener(view -> {
++            if (!SetupWizardUtils.isOwner() || SetupWizardUtils.isManagedProfile(this)
++                    || glitchWelcomeSeen) {
++                onNextPressed();
++                return;
++            }
++            glitchWelcome = new GlitchWelcomeScene(this, () -> {
++                glitchWelcomeSeen = true;
++                onNextPressed();
++            });
++            glitchWelcome.show();
++        });
+         findViewById(R.id.launch_accessibility)
+                 .setOnClickListener(
+                         view -> startSubactivity(new Intent(ACTION_ACCESSIBILITY_SETTINGS)));
+@@ -60,7 +74,7 @@
+             welcomeTitle.setText(getString(R.string.setup_managed_profile_welcome_message));
+         } else {
+             welcomeTitle.setText(getString(R.string.setup_welcome_message,
+-                    getString(R.string.os_name)));
++                    SetupWizardUtils.isOwner() ? "glitchOS" : getString(R.string.os_name)));
+         }
+ 
+         if (Build.TYPE.equals("eng")) {
+@@ -69,6 +83,12 @@
+                 SetupWizardUtils.finishSetupWizard(WelcomeActivity.this);
+             });
+         }
++    }
++
++    @Override
++    public void onDestroy() {
++        if (glitchWelcome != null) glitchWelcome.dismiss();
++        super.onDestroy();
+     }
+ 
+     @Override
+diff --git a/src/org/lineageos/setupwizard/GlitchWelcomeScene.java b/src/org/lineageos/setupwizard/GlitchWelcomeScene.java
+new file mode 100644
+--- /dev/null
++++ b/src/org/lineageos/setupwizard/GlitchWelcomeScene.java
+@@ -0,0 +1,134 @@
++/*
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard;
++
++import android.animation.ValueAnimator;
++import android.app.Activity;
++import android.app.AlertDialog;
++import android.os.PowerManager;
++import android.widget.LinearLayout;
++import android.widget.TextView;
++
++import java.util.Random;
++
++/** An optional scene between the welcome screen and the next setup step. */
++final class GlitchWelcomeScene {
++    private final Activity activity;
++    private final Runnable continueSetup;
++    private final boolean russian;
++    private final int glitchPage;
++    private final boolean surprised;
++    private AlertDialog dialog;
++    private TextView line;
++    private TextView preview;
++    private TextView reaction;
++    private int page;
++    private boolean effects;
++
++    GlitchWelcomeScene(Activity activity, Runnable continueSetup) {
++        this.activity = activity;
++        this.continueSetup = continueSetup;
++        russian = "ru".equals(activity.getResources().getConfiguration().getLocales().get(0).getLanguage());
++        Random random = new Random();
++        glitchPage = 1 + random.nextInt(2);
++        surprised = random.nextBoolean();
++    }
++
++    void show() {
++        LinearLayout body = new LinearLayout(activity);
++        body.setOrientation(LinearLayout.VERTICAL);
++        body.setPadding(dp(24), dp(12), dp(24), dp(12));
++        line = addText(body, 18);
++        preview = addText(body, 16);
++        reaction = addText(body, 16);
++        android.widget.ScrollView scroll = new android.widget.ScrollView(activity);
++        scroll.addView(body);
++        dialog = new AlertDialog.Builder(activity)
++                .setTitle("glitchOS")
++                .setView(scroll)
++                .setPositiveButton(tr("С эффектом", "With effect"), null)
++                .setNeutralButton(tr("Без эффекта", "Without effect"), null)
++                .setNegativeButton(tr("Пропустить", "Skip"), null)
++                .create();
++        dialog.setOnDismissListener(ignored -> preview.animate().cancel());
++        dialog.show();
++        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> advance(true));
++        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> advance(false));
++        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(view -> finishScene());
++        render();
++    }
++
++    void dismiss() {
++        if (dialog != null) dialog.dismiss();
++    }
++
++    private void advance(boolean withEffects) {
++        if (page == 3) {
++            finishScene();
++            return;
++        }
++        if (page == 0) effects = withEffects;
++        page++;
++        render();
++    }
++
++    private void render() {
++        preview.animate().cancel();
++        preview.setTranslationX(0);
++        preview.setVisibility(android.view.View.GONE);
++        reaction.setVisibility(android.view.View.GONE);
++        if (page == 0) {
++            line.setText(tr("Во вступлении есть странные реплики и короткий постановочный сбой.",
++                    "This introduction contains unsettling lines and a brief staged glitch."));
++            return;
++        }
++        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setVisibility(android.view.View.GONE);
++        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText(
++                page == 3 ? tr("Продолжить настройку", "Continue setup") : tr("Дальше", "Next"));
++        if (page == 3) {
++            line.setText(tr("Это была постановка. Эти реплики заранее написаны. Сцена не использует камеру, микрофон или личные данные.",
++                    "That was staged. These lines are scripted. This scene uses no camera, microphone, or personal data."));
++            return;
++        }
++        line.setText(page == 1
++                ? tr("Мы всегда следим за вами, чтобы предугадать ваши желания. Ты красиво выглядишь, когда экран гаснет. Кто из нас тогда остаётся здесь?",
++                     "We're always watching so we can anticipate what you want. You look lovely when the screen goes dark. Which of us stays here then?")
++                : tr("Твои волосы так прекрасно пахнут. …По крайней мере, я так себе это представляю.",
++                     "Your hair smells wonderful. …At least, that's how I imagine it."));
++        preview.setText(page == 1 ? tr("◈  Образец плитки", "◈  Tile preview")
++                : tr("▧  Образец фона", "▧  Wallpaper preview"));
++        preview.setVisibility(android.view.View.VISIBLE);
++        PowerManager power = activity.getSystemService(PowerManager.class);
++        if (effects && page == glitchPage && ValueAnimator.areAnimatorsEnabled()
++                && (power == null || !power.isPowerSaveMode())) {
++            preview.setTranslationX(dp(12));
++            preview.animate().translationX(0).setDuration(380).start();
++            reaction.setText(surprised ? tr("Стой… ты тоже это видел?", "Wait… did you see that too?")
++                    : tr("Вот. Теперь ты заметил.", "There. You noticed this time."));
++            reaction.setVisibility(android.view.View.VISIBLE);
++        }
++    }
++
++    private void finishScene() {
++        dismiss();
++        continueSetup.run();
++    }
++
++    private TextView addText(LinearLayout body, int size) {
++        TextView view = new TextView(activity);
++        view.setTextSize(size);
++        view.setPadding(0, dp(8), 0, dp(8));
++        body.addView(view);
++        return view;
++    }
++
++    private String tr(String ru, String en) {
++        return russian ? ru : en;
++    }
++
++    private int dp(int value) {
++        return Math.round(value * activity.getResources().getDisplayMetrics().density);
++    }
++}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ContourTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowBackground">#090D12</item>
+        <item name="android:colorAccent">#BBF2CF</item>
+        <item name="android:statusBarColor">#090D12</item>
+        <item name="android:navigationBarColor">#090D12</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+    <string name="app_name">glitchOS</string>
+    <string name="quiet_tile">Пауза анимации</string>
+</resources>

@@ -1,0 +1,110 @@
+diff --git a/quickstep/AndroidManifest-launcher.xml b/quickstep/AndroidManifest-launcher.xml
+index 55736af53b..9adb9a9ae5 100644
+--- a/quickstep/AndroidManifest-launcher.xml
++++ b/quickstep/AndroidManifest-launcher.xml
+@@ -52,16 +52,8 @@
+             android:resizeableActivity="true"
+             android:resumeWhilePausing="true"
+             android:taskAffinity=""
+-            android:exported="true"
++            android:exported="false"
+             android:enabled="true">
+-            <intent-filter>
+-                <action android:name="android.intent.action.MAIN" />
+-                <action android:name="android.intent.action.SHOW_WORK_APPS" />
+-                <category android:name="android.intent.category.HOME" />
+-                <category android:name="android.intent.category.DEFAULT" />
+-                <category android:name="android.intent.category.MONKEY"/>
+-                <category android:name="android.intent.category.LAUNCHER_APP" />
+-            </intent-filter>
+             <meta-data
+                 android:name="com.android.launcher3.grid.control"
+                 android:value="${packageName}.grid_control" />
+diff --git a/quickstep/src/com/android/quickstep/OverviewComponentObserver.java b/quickstep/src/com/android/quickstep/OverviewComponentObserver.java
+index e3da9f55f9..524b438ad1 100644
+--- a/quickstep/src/com/android/quickstep/OverviewComponentObserver.java
++++ b/quickstep/src/com/android/quickstep/OverviewComponentObserver.java
+@@ -92,6 +92,7 @@ public final class OverviewComponentObserver {
+     private Intent mOverviewIntent;
+     private boolean mIsHomeAndOverviewSame;
+     private boolean mIsDefaultHome;
++    private final boolean mHasHomeActivity;
+     private boolean mIsHomeDisabled;
+ 
+     @Inject
+@@ -102,10 +103,14 @@ public final class OverviewComponentObserver {
+         mCurrentHomeIntent = createHomeIntent();
+         mMyHomeIntent = new Intent(mCurrentHomeIntent).setPackage(mContext.getPackageName());
+         ResolveInfo info = context.getPackageManager().resolveActivity(mMyHomeIntent, 0);
+-        ComponentName myHomeComponent =
+-                new ComponentName(context.getPackageName(), info.activityInfo.name);
+-        mMyHomeIntent.setComponent(myHomeComponent);
+-        mConfigChangesMap.append(myHomeComponent.hashCode(), info.activityInfo.configChanges);
++        // glitchOS keeps Quickstep as the recents provider without exposing its desktop.
++        mHasHomeActivity = info != null && info.activityInfo != null;
++        if (mHasHomeActivity) {
++            ComponentName myHomeComponent =
++                    new ComponentName(context.getPackageName(), info.activityInfo.name);
++            mMyHomeIntent.setComponent(myHomeComponent);
++            mConfigChangesMap.append(myHomeComponent.hashCode(), info.activityInfo.configChanges);
++        }
+         mSetupWizardPkg = context.getString(R.string.setup_wizard_pkg);
+ 
+         ComponentName fallbackComponent = new ComponentName(mContext, RecentsActivity.class);
+@@ -166,7 +171,8 @@ public final class OverviewComponentObserver {
+             defaultHome = null;
+         }
+ 
+-        mIsDefaultHome = Objects.equals(mMyHomeIntent.getComponent(), defaultHome);
++        mIsDefaultHome = mHasHomeActivity
++                && Objects.equals(mMyHomeIntent.getComponent(), defaultHome);
+ 
+         // Set assistant visibility to 0 from launcher's perspective, ensures any elements that
+         // launcher made invisible become visible again before the new activity control helper
+@@ -177,7 +183,7 @@ public final class OverviewComponentObserver {
+ 
+         if (SEPARATE_RECENTS_ACTIVITY.get() || Flags.enableLauncherOverviewInWindow()) {
+             mIsDefaultHome = false;
+-            if (defaultHome == null) {
++            if (defaultHome == null && mHasHomeActivity) {
+                 defaultHome = mMyHomeIntent.getComponent();
+             }
+         }
+@@ -187,7 +193,7 @@ public final class OverviewComponentObserver {
+                 + ", isDefaultHomeNull=" + (defaultHome == null)
+                 + ", mIsDefaultHome=" + mIsDefaultHome);
+ 
+-        if (!mIsHomeDisabled && (defaultHome == null || mIsDefaultHome)) {
++        if (mHasHomeActivity && !mIsHomeDisabled && (defaultHome == null || mIsDefaultHome)) {
+             // User default home is same as out home app. Use Overview integrated in Launcher.
+             mContainerInterface = LauncherActivityInterface.INSTANCE;
+             mIsHomeAndOverviewSame = true;
+diff --git a/quickstep/src/com/android/quickstep/fallback/FallbackRecentsView.java b/quickstep/src/com/android/quickstep/fallback/FallbackRecentsView.java
+index daad6b75e9..db6bf537d4 100644
+--- a/quickstep/src/com/android/quickstep/fallback/FallbackRecentsView.java
++++ b/quickstep/src/com/android/quickstep/fallback/FallbackRecentsView.java
+@@ -130,7 +130,7 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
+             @Nullable AnimatorSet animatorSet, GestureState.GestureEndTarget endTarget,
+             TaskViewSimulator[] taskViewSimulators) {
+         super.onPrepareGestureEndAnimation(animatorSet, endTarget, taskViewSimulators);
+-        if (mHomeTask != null && endTarget == RECENTS && animatorSet != null) {
++        if (mHomeTask != null && endTarget == RECENTS) {
+             TaskView tv = getTaskViewByTaskId(mHomeTask.key.id);
+             if (tv != null) {
+                 PendingAnimation pa = new PendingAnimation(TASK_DISMISS_DURATION);
+@@ -139,7 +139,14 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
+                 pa.addEndListener(e -> setCurrentTask(-1));
+                 AnimatorPlaybackController controller = pa.createPlaybackController();
+                 controller.dispatchOnStart();
+-                animatorSet.play(controller.getAnimationPlayer());
++                if (animatorSet != null) {
++                    animatorSet.play(controller.getAnimationPlayer());
++                } else {
++                    // Atomic overview commands have no gesture animator. Remove the invisible
++                    // home placeholder immediately so the latest real task is centered.
++                    controller.setPlayFraction(1);
++                    controller.dispatchOnEnd();
++                }
+             }
+         }
+     }
